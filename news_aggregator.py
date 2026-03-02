@@ -51,6 +51,8 @@ def load_config(config_path: str) -> dict:
     return {
         "api_key": api_key,
         "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "slack_bot_token": os.getenv("SLACK_BOT_TOKEN"),
+        "slack_channel": os.getenv("SLACK_CHANNEL"),
     }
 
 
@@ -356,6 +358,37 @@ def query_gemini(config: dict, user_prompt: str, news_context: str) -> str:
     return response.text
 
 
+def send_to_slack(config: dict, text: str) -> None:
+    """Send text to Slack channel if Slack config is present in .env."""
+    token = config.get("slack_bot_token")
+    channel = config.get("slack_channel")
+
+    if not token or not channel:
+        return
+
+    try:
+        from slack_sdk import WebClient
+        from slack_sdk.errors import SlackApiError
+
+        client = WebClient(token=token)
+
+        # Slack has a ~4000 char limit per message; split if needed
+        max_len = 3900
+        chunks = [text[i : i + max_len] for i in range(0, len(text), max_len)]
+
+        for chunk in chunks:
+            client.chat_postMessage(channel=channel, text=chunk)
+
+        print(
+            f"Slack: sent {len(chunks)} message(s) to channel {channel}.",
+            file=sys.stderr,
+        )
+    except SlackApiError as e:
+        print(f"Slack API error: {e.response['error']}", file=sys.stderr)
+    except Exception as e:
+        print(f"Slack error: {e}", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Aggregate RSS news feeds and summarize with Gemini AI.",
@@ -440,6 +473,9 @@ def main():
     except Exception as e:
         print(f"Error calling Gemini API: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # Send to Slack if configured
+    send_to_slack(config, response)
 
 
 if __name__ == "__main__":

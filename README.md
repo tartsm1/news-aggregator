@@ -10,6 +10,7 @@ A **zero-cost AI-powered news aggregator** written in Python. It fetches RSS fee
 - 📄 **HTML output** — generate a clean, sortable HTML page of all articles
 - ⏱️ **Cron-friendly** — designed to run unattended on a Raspberry Pi or any server
 - 🆓 **Zero cost** — uses Google's free-tier Gemini API
+- 💬 **Slack notifications** — optionally send summaries straight to a Slack channel
 
 ## 🛠️ Prerequisites
 
@@ -98,6 +99,24 @@ You can add your own lists by editing `lists.json`:
 ```
 
 Use `--list all` to fetch from every list at once.
+
+## 💬 Slack Integration (Optional)
+
+To automatically send the AI summary to a Slack channel, add the following to your `.env` file:
+
+```env
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_CHANNEL=C0YOUR_CHANNEL_ID
+
+```
+
+**Setup steps:**
+
+1. Create a [Slack App](https://api.slack.com/apps) and add the `chat:write` bot scope
+2. Install the app to your workspace and copy the **Bot User OAuth Token** (`xoxb-...`)
+3. Invite the bot to your target channel, then copy the **Channel ID** from the channel details
+
+When these variables are set, the Gemini summary is posted to Slack automatically after each run. If they are absent, the program behaves as usual (stdout only).
 
 ## ⏰ Cron Setup (Raspberry Pi / Linux)
 
