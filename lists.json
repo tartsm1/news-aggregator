@@ -25,7 +25,6 @@
     "http://feedmaker.kindle4rss.com/feeds/us.cnn.xml",
     "http://feedmaker.kindle4rss.com/feeds/world.theguardian.xml",
     "https://rsshub.app/bbc/",
-    "http://www.newslookup.com/rss/business/bloomberg.rss",
     "http://www.washingtonpost.com/wp-dyn/rss/world/index.xml",
     "https://rsshub.app/bbc/world",
     "http://www.which.co.uk/feeds/news.xml",
@@ -33,13 +32,11 @@
     "http://www.ibtimes.co.uk/rss/technology",
     "https://www.theguardian.com/international/rss",
     "http://www.nytimes.com/services/xml/rss/nyt/World.xml",
-    "http://www.wired.com/news/feeds/rss2/0,2610,,00.xml",
     "http://uudised.err.ee/rss",
     "http://feeds.feedburner.com/daily-express-tech",
     "https://www.helpnetsecurity.com/view/news/feed/"
   ],
   "FINANCE": [
-    "https://www.reuters.com/markets/rss",
     "https://feeds.bloomberg.com/markets/news.rss",
     "https://www.ft.com/rss/home",
     "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",

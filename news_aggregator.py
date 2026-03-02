@@ -9,11 +9,15 @@ Usage:
 """
 
 import argparse
+import html as html_module
 import json
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 import feedparser
@@ -79,10 +83,18 @@ def load_feeds(feeds_path: str, feed_list: str) -> list[str]:
     return data[feed_list_upper]
 
 
-def fetch_feed(url: str, max_articles: int) -> dict:
+def fetch_feed(url: str, max_articles: int, timeout: int = 10) -> dict:
     """Fetch and parse a single RSS feed. Returns dict with source and articles."""
     try:
-        feed = feedparser.parse(url)
+        import ssl
+        import urllib.request
+
+        headers = {"User-Agent": "NewsAggregator/1.0"}
+        req = urllib.request.Request(url, headers=headers)
+        ctx = ssl.create_default_context()
+        response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+        content = response.read()
+        feed = feedparser.parse(content)
 
         if feed.bozo and not feed.entries:
             return {"url": url, "error": str(feed.bozo_exception), "articles": []}
@@ -101,7 +113,6 @@ def fetch_feed(url: str, max_articles: int) -> dict:
             summary = entry.get("summary", entry.get("description", ""))
             if summary:
                 # Strip HTML tags for cleaner text
-                import re
                 summary = re.sub(r"<[^>]+>", "", summary).strip()
                 # Truncate very long summaries
                 if len(summary) > 500:
@@ -175,6 +186,157 @@ def build_news_context(feed_results: list[dict]) -> str:
     return "\n\n".join(sections)
 
 
+def parse_date(date_str: str) -> datetime:
+    """Try to parse an RSS date string into a datetime object."""
+    if not date_str:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    # Try RFC 2822 format first (most common in RSS)
+    try:
+        return parsedate_to_datetime(date_str)
+    except (ValueError, TypeError):
+        pass
+    # Try ISO 8601 format
+    try:
+        return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        pass
+    return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def generate_html(feed_results: list[dict], output_path: str) -> None:
+    """Generate an HTML file with all articles sorted by date descending."""
+    # Collect all articles with their source
+    all_articles = []
+    for result in feed_results:
+        if result["error"] or not result["articles"]:
+            continue
+        source = result.get("source", result["url"])
+        for article in result["articles"]:
+            all_articles.append({**article, "source": source})
+
+    # Sort by date descending
+    all_articles.sort(key=lambda a: parse_date(a["published"]), reverse=True)
+
+    # Build HTML rows
+    rows = []
+    for a in all_articles:
+        title = html_module.escape(a["title"])
+        source = html_module.escape(a["source"])
+        summary = html_module.escape(a.get("summary", ""))
+        published = html_module.escape(a.get("published", "—"))
+        link = html_module.escape(a.get("link", ""))
+
+        title_html = f'<a href="{link}" target="_blank">{title}</a>' if link else title
+
+        rows.append(f"""      <tr>
+        <td class="date">{published}</td>
+        <td>
+          <div class="title">{title_html}</div>
+          <div class="source">{source}</div>
+          {f'<div class="summary">{summary}</div>' if summary else ''}
+        </td>
+      </tr>""")
+
+    table_rows = "\n".join(rows)
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Aggregator</title>
+  <style>
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+      padding: 2rem;
+    }}
+    .container {{ max-width: 960px; margin: 0 auto; }}
+    h1 {{
+      font-size: 1.8rem;
+      margin-bottom: 0.3rem;
+      color: #1a1a1a;
+    }}
+    .meta {{
+      color: #888;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }}
+    th {{
+      background: #fafafa;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      border-bottom: 2px solid #eee;
+    }}
+    td {{
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }}
+    tr:last-child td {{ border-bottom: none; }}
+    tr:hover {{ background: #fafbfc; }}
+    .date {{
+      white-space: nowrap;
+      font-size: 0.82rem;
+      color: #888;
+      min-width: 140px;
+    }}
+    .title a {{
+      color: #1a73e8;
+      text-decoration: none;
+      font-weight: 500;
+    }}
+    .title a:hover {{ text-decoration: underline; }}
+    .source {{
+      font-size: 0.8rem;
+      color: #999;
+      margin-top: 0.15rem;
+    }}
+    .summary {{
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: 0.3rem;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📰 News Aggregator</h1>
+    <p class="meta">{len(all_articles)} articles &middot; Generated {generated_at}</p>
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Article</th></tr>
+      </thead>
+      <tbody>
+{table_rows}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
+"""
+
+    Path(output_path).write_text(html_content, encoding="utf-8")
+    print(f"HTML output written to: {output_path}", file=sys.stderr)
+
+
 def query_gemini(config: dict, user_prompt: str, news_context: str) -> str:
     """Send the prompt + news context to Gemini and return the response."""
     client = genai.Client(api_key=config["api_key"])
@@ -231,6 +393,12 @@ def main():
         default=5,
         help="Maximum number of articles to fetch per feed. Default: 5",
     )
+    parser.add_argument(
+        "--html-out",
+        default=None,
+        metavar="FILE",
+        help="Path to write an HTML file with all articles sorted by date.",
+    )
 
     args = parser.parse_args()
 
@@ -260,6 +428,10 @@ def main():
     if not news_context.strip():
         print("Error: No articles were fetched. Cannot proceed.", file=sys.stderr)
         sys.exit(1)
+
+    # Generate HTML if requested
+    if args.html_out:
+        generate_html(feed_results, args.html_out)
 
     # Query Gemini
     try:
