@@ -50,7 +50,7 @@ def load_config(config_path: str) -> dict:
 
     return {
         "api_key": api_key,
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "model": os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
         "slack_bot_token": os.getenv("SLACK_BOT_TOKEN"),
         "slack_channel": os.getenv("SLACK_CHANNEL"),
     }

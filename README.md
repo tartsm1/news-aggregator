@@ -45,7 +45,7 @@ A **zero-cost AI-powered news aggregator** written in Python. It fetches RSS fee
 
    ```env
    GEMINI_API_KEY=your-api-key-here
-   GEMINI_MODEL=gemini-2.5-flash
+   GEMINI_MODEL=gemini-3.1-flash-lite-preview
    ```
 
 ## 🚀 Usage
